@@ -1,6 +1,9 @@
 #include "compile.h"
 #include "util.h"
+
 #include "ext/vec.h"
+#define SV_IMPLEMENTATION
+#include "ext/sv.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -9,141 +12,177 @@
 
 typedef vec_t(chaw_token_t) chaw_vec_token_t;
 
-typedef struct {
-	size_t length;
-	char const *string;
-} chaw_punct_metadata_t;
+String_View chaw_punctuators[] = {
+	[CHAW_PUNCT_BRACKET_OPEN] = SV_STATIC("["),
+	[CHAW_PUNCT_BRACKET_CLOSE] = SV_STATIC("]"),
+	[CHAW_PUNCT_PARENT_OPEN] = SV_STATIC("("),
+	[CHAW_PUNCT_PARENT_CLOSE] = SV_STATIC(")"),
+	[CHAW_PUNCT_BRACE_OPEN] = SV_STATIC("{"),
+	[CHAW_PUNCT_BRACE_CLOSE] = SV_STATIC("}"),
+	[CHAW_PUNCT_DOT] = SV_STATIC("."),
+	[CHAW_PUNCT_COMMA] = SV_STATIC(","),
 
-typedef struct {
-	size_t length;
-	char const *string;
-} chaw_kword_metadata_t;
+	[CHAW_PUNCT_NAMESPACE] = SV_STATIC("::"),
 
-#define DECLARE_PUNCT(t, s) [t] = { \
-	.length = CHAW_COUNTOF(s), \
-	.string = s \
-}
+	[CHAW_PUNCT_INCREMENT] = SV_STATIC("++"),
+	[CHAW_PUNCT_DECREMENT] = SV_STATIC("--"),
 
-chaw_punct_metadata_t chaw_punctuators[] = {
-	DECLARE_PUNCT(CHAW_PUNCT_BRACKET_OPEN, "["),
-	DECLARE_PUNCT(CHAW_PUNCT_BRACKET_CLOSE, "]"),
-	DECLARE_PUNCT(CHAW_PUNCT_PARENT_OPEN, "("),
-	DECLARE_PUNCT(CHAW_PUNCT_PARENT_CLOSE, ")"),
-	DECLARE_PUNCT(CHAW_PUNCT_BRACE_OPEN, "{"),
-	DECLARE_PUNCT(CHAW_PUNCT_BRACE_CLOSE, "}"),
-	DECLARE_PUNCT(CHAW_PUNCT_DOT, "."),
-	DECLARE_PUNCT(CHAW_PUNCT_COMMA, ","),
-	DECLARE_PUNCT(CHAW_PUNCT_SEMICOLON, ";"),
+	[CHAW_PUNCT_ASSIGN_ADD] = SV_STATIC("+="),
+	[CHAW_PUNCT_ASSIGN_SUB] = SV_STATIC("-="),
+	[CHAW_PUNCT_ASSIGN_MUL] = SV_STATIC("*="),
+	[CHAW_PUNCT_ASSIGN_DIV] = SV_STATIC("/="),
+	[CHAW_PUNCT_ASSIGN_MOD] = SV_STATIC("%="),
 
-	DECLARE_PUNCT(CHAW_PUNCT_LOOP_DECLARE, "@"),
-	DECLARE_PUNCT(CHAW_PUNCT_LOOP_IDENTIFIER, "$"),
+	[CHAW_PUNCT_ASSIGN_NEG] = SV_STATIC("~="),
+	[CHAW_PUNCT_ASSIGN_OR] = SV_STATIC("|="),
+	[CHAW_PUNCT_ASSIGN_XOR] = SV_STATIC("^="),
+	[CHAW_PUNCT_ASSIGN_AND] = SV_STATIC("&="),
+	[CHAW_PUNCT_ASSIGN_SHR] = SV_STATIC(">>="),
+	[CHAW_PUNCT_ASSIGN_SHL] = SV_STATIC("<<="),
 
-	DECLARE_PUNCT(CHAW_PUNCT_NAMESPACE, "::"),
+	[CHAW_PUNCT_EQUAL] = SV_STATIC("=="),
+	[CHAW_PUNCT_NOT_EQUAL] = SV_STATIC("!="),
+	[CHAW_PUNCT_LESS_OR_EQ_THAN] = SV_STATIC("<="),
+	[CHAW_PUNCT_GREATER_OR_EQ_THAN] = SV_STATIC(">="),
+	[CHAW_PUNCT_LESS_THAN] = SV_STATIC("<"),
+	[CHAW_PUNCT_GREATER_THAN] = SV_STATIC(">"),
+	[CHAW_PUNCT_SET] = SV_STATIC("="),
+	[CHAW_PUNCT_ADD] = SV_STATIC("+"),
+	[CHAW_PUNCT_SUB] = SV_STATIC("-"),
+	[CHAW_PUNCT_MUL] = SV_STATIC("*"),
+	[CHAW_PUNCT_DIV] = SV_STATIC("/"),
+	[CHAW_PUNCT_MOD] = SV_STATIC("%"),
+	[CHAW_PUNCT_NOT] = SV_STATIC("!"),
 
-	DECLARE_PUNCT(CHAW_PUNCT_INCREMENT, "++"),
-	DECLARE_PUNCT(CHAW_PUNCT_DECREMENT, "--"),
+	[CHAW_PUNCT_NEG] = SV_STATIC("~"),
+	[CHAW_PUNCT_OR] = SV_STATIC("|"),
+	[CHAW_PUNCT_XOR] = SV_STATIC("^"),
+	[CHAW_PUNCT_AND] = SV_STATIC("&"),
 
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_ADD, "+="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_SUB, "-="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_MUL, "*="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_DIV, "/="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_MOD, "%="),
-
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_NEG, "~="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_OR, "|="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_XOR, "^="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_AND, "&="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_SHR, ">>="),
-	DECLARE_PUNCT(CHAW_PUNCT_ASSIGN_SHL, "<<="),
-
-	DECLARE_PUNCT(CHAW_PUNCT_EQUAL, "=="),
-	DECLARE_PUNCT(CHAW_PUNCT_NOT_EQUAL, "!="),
-	DECLARE_PUNCT(CHAW_PUNCT_LESS_OR_EQ_THAN, "<="),
-	DECLARE_PUNCT(CHAW_PUNCT_GREATER_OR_EQ_THAN, ">="),
-	DECLARE_PUNCT(CHAW_PUNCT_LESS_THAN, "<"),
-	DECLARE_PUNCT(CHAW_PUNCT_GREATER_THAN, ">"),
-
-	DECLARE_PUNCT(CHAW_PUNCT_SET, "="),
-
-	DECLARE_PUNCT(CHAW_PUNCT_ADD, "+"),
-	DECLARE_PUNCT(CHAW_PUNCT_SUB, "-"),
-	DECLARE_PUNCT(CHAW_PUNCT_MUL, "*"),
-	DECLARE_PUNCT(CHAW_PUNCT_DIV, "/"),
-	DECLARE_PUNCT(CHAW_PUNCT_MOD, "%"),
-
-	DECLARE_PUNCT(CHAW_PUNCT_NOT, "!"),
-	DECLARE_PUNCT(CHAW_PUNCT_NEG, "~"),
-	DECLARE_PUNCT(CHAW_PUNCT_OR, "|"),
-	DECLARE_PUNCT(CHAW_PUNCT_XOR, "^"),
-	DECLARE_PUNCT(CHAW_PUNCT_AND, "&"),
-
-	DECLARE_PUNCT(CHAW_PUNCT_THEN, "?"),
-	DECLARE_PUNCT(CHAW_PUNCT_ELSE, ":"),
+	[CHAW_PUNCT_THEN] = SV_STATIC("?"),
+	[CHAW_PUNCT_ELSE] = SV_STATIC(":"),
 };
 
-#undef DECLARE_PUNCT
+String_View chaw_script_punctuators[] = {
+	[CHAW_SCRIPT_PUNCT_BRACKET_OPEN] = SV_STATIC("["),
+	[CHAW_SCRIPT_PUNCT_BRACKET_CLOSE] = SV_STATIC("]"),
+	[CHAW_SCRIPT_PUNCT_PARENT_OPEN] = SV_STATIC("("),
+	[CHAW_SCRIPT_PUNCT_PARENT_CLOSE] = SV_STATIC(")"),
+	[CHAW_SCRIPT_PUNCT_BRACE_OPEN] = SV_STATIC("{"),
+	[CHAW_SCRIPT_PUNCT_BRACE_CLOSE] = SV_STATIC("}"),
+	[CHAW_SCRIPT_PUNCT_DOT] = SV_STATIC("."),
+	[CHAW_SCRIPT_PUNCT_COMMA] = SV_STATIC(","),
 
-#define DECLARE_KWORD(t, s) [t] = { \
-	.length = CHAW_COUNTOF(s), \
-	.string = s \
-}
+	[CHAW_SCRIPT_PUNCT_SEMICOLON] = SV_STATIC(";"),
 
-chaw_kword_metadata_t chaw_keywords[] = {
-	DECLARE_KWORD(CHAW_KWORD_ITEM, "ITEM"),
-	DECLARE_KWORD(CHAW_KWORD_FREE, "FREE"),
-	DECLARE_KWORD(CHAW_KWORD_VAR, "VAR"),
-	DECLARE_KWORD(CHAW_KWORD_BYTE, "BYTE"),
-	DECLARE_KWORD(CHAW_KWORD_SHORT, "SHORT"),
-	DECLARE_KWORD(CHAW_KWORD_LONG, "LONG"),
-	DECLARE_KWORD(CHAW_KWORD_CHUNK, "CHUNK"),
-	DECLARE_KWORD(CHAW_KWORD_ENDCHUNK, "ENDCHUNK"),
-	DECLARE_KWORD(CHAW_KWORD_ADOPT, "ADOPT"),
-	DECLARE_KWORD(CHAW_KWORD_CHILD, "CHILD"),
-	DECLARE_KWORD(CHAW_KWORD_PARENT, "PARENT"),
-	DECLARE_KWORD(CHAW_KWORD_BO, "BO"),
-	DECLARE_KWORD(CHAW_KWORD_OSK, "OSK"),
-	DECLARE_KWORD(CHAW_KWORD_STN, "STN"),
-	DECLARE_KWORD(CHAW_KWORD_STZ, "STZ"),
-	DECLARE_KWORD(CHAW_KWORD_SZ, "SZ"),
-	DECLARE_KWORD(CHAW_KWORD_ST, "ST"),
-	DECLARE_KWORD(CHAW_KWORD_ALIGN, "ALIGN"),
-	DECLARE_KWORD(CHAW_KWORD_FILE, "FILE"),
-	DECLARE_KWORD(CHAW_KWORD_PACKEDFILE, "PACKEDFILE"),
-	DECLARE_KWORD(CHAW_KWORD_META, "META"),
-	DECLARE_KWORD(CHAW_KWORD_BITMAP, "BITMAP"),
-	DECLARE_KWORD(CHAW_KWORD_MASK, "MASK"),
-	DECLARE_KWORD(CHAW_KWORD_MIDI, "MIDI"),
-	DECLARE_KWORD(CHAW_KWORD_SCRIPT, "SCRIPT"),
-	DECLARE_KWORD(CHAW_KWORD_SCRIPTPF, "SCRIPTPF"),
-	DECLARE_KWORD(CHAW_KWORD_GL, "GL"),
-	DECLARE_KWORD(CHAW_KWORD_AL, "AL"),
-	DECLARE_KWORD(CHAW_KWORD_GG, "GG"),
-	DECLARE_KWORD(CHAW_KWORD_AG, "AG"),
-	DECLARE_KWORD(CHAW_KWORD_GST, "GST"),
-	DECLARE_KWORD(CHAW_KWORD_AST, "AST"),
-	DECLARE_KWORD(CHAW_KWORD_MACBO, "MACBO"),
-	DECLARE_KWORD(CHAW_KWORD_WINBO, "WINBO"),
-	DECLARE_KWORD(CHAW_KWORD_MACOSK, "MACOSK"),
-	DECLARE_KWORD(CHAW_KWORD_WINOSK, "WINOSK"),
-	DECLARE_KWORD(CHAW_KWORD_LONER, "LONER"),
-	DECLARE_KWORD(CHAW_KWORD_CURSOR, "CURSOR"),
-	DECLARE_KWORD(CHAW_KWORD_PALETTE, "PALETTE"),
-	DECLARE_KWORD(CHAW_KWORD_PREPACKED, "PREPACKED"),
-	DECLARE_KWORD(CHAW_KWORD_PACK, "PACK"),
-	DECLARE_KWORD(CHAW_KWORD_PACKFMT, "PACKFMT"),
-	DECLARE_KWORD(CHAW_KWORD_SUBFILE, "SUBFILE"),
-	DECLARE_KWORD(CHAW_KWORD_SET, "SET"),
+	[CHAW_SCRIPT_PUNCT_NAMESPACE] = SV_STATIC("::"),
+
+	[CHAW_SCRIPT_PUNCT_INCREMENT] = SV_STATIC("++"),
+	[CHAW_SCRIPT_PUNCT_DECREMENT] = SV_STATIC("--"),
+
+	[CHAW_SCRIPT_PUNCT_LOOP_DECLARE] = SV_STATIC("@"),
+	[CHAW_SCRIPT_PUNCT_LOOP_REF] = SV_STATIC("$"),
+
+	[CHAW_SCRIPT_PUNCT_ASSIGN_ADD] = SV_STATIC("+="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_SUB] = SV_STATIC("-="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_MUL] = SV_STATIC("*="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_DIV] = SV_STATIC("/="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_MOD] = SV_STATIC("%="),
+
+	[CHAW_SCRIPT_PUNCT_ASSIGN_NEG] = SV_STATIC("~="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_OR] = SV_STATIC("|="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_XOR] = SV_STATIC("^="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_AND] = SV_STATIC("&="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_SHR] = SV_STATIC(">>="),
+	[CHAW_SCRIPT_PUNCT_ASSIGN_SHL] = SV_STATIC("<<="),
+
+	[CHAW_SCRIPT_PUNCT_EQUAL] = SV_STATIC("=="),
+	[CHAW_SCRIPT_PUNCT_NOT_EQUAL] = SV_STATIC("!="),
+	[CHAW_SCRIPT_PUNCT_LESS_OR_EQ_THAN] = SV_STATIC("<="),
+	[CHAW_SCRIPT_PUNCT_GREATER_OR_EQ_THAN] = SV_STATIC(">="),
+	[CHAW_SCRIPT_PUNCT_LESS_THAN] = SV_STATIC("<"),
+	[CHAW_SCRIPT_PUNCT_GREATER_THAN] = SV_STATIC(">"),
+	[CHAW_SCRIPT_PUNCT_SET] = SV_STATIC("="),
+	[CHAW_SCRIPT_PUNCT_ADD] = SV_STATIC("+"),
+	[CHAW_SCRIPT_PUNCT_SUB] = SV_STATIC("-"),
+	[CHAW_SCRIPT_PUNCT_MUL] = SV_STATIC("*"),
+	[CHAW_SCRIPT_PUNCT_DIV] = SV_STATIC("/"),
+	[CHAW_SCRIPT_PUNCT_MOD] = SV_STATIC("%"),
+	[CHAW_SCRIPT_PUNCT_NOT] = SV_STATIC("!"),
+
+	[CHAW_SCRIPT_PUNCT_NEG] = SV_STATIC("~"),
+	[CHAW_SCRIPT_PUNCT_OR] = SV_STATIC("|"),
+	[CHAW_SCRIPT_PUNCT_XOR] = SV_STATIC("^"),
+	[CHAW_SCRIPT_PUNCT_AND] = SV_STATIC("&"),
+	
+	[CHAW_SCRIPT_PUNCT_THEN] = SV_STATIC("?"),
+	[CHAW_SCRIPT_PUNCT_ELSE] = SV_STATIC(":"),
 };
 
-#undef DECLARE_KWORD
+String_View chaw_keywords[] = {
+	[CHAW_KWORD_ITEM] = SV_STATIC("ITEM"),
+	[CHAW_KWORD_FREE] = SV_STATIC("FREE"),
+	[CHAW_KWORD_VAR] = SV_STATIC("VAR"),
+	[CHAW_KWORD_BYTE] = SV_STATIC("BYTE"),
+	[CHAW_KWORD_SHORT] = SV_STATIC("SHORT"),
+	[CHAW_KWORD_LONG] = SV_STATIC("LONG"),
+	[CHAW_KWORD_CHUNK] = SV_STATIC("CHUNK"),
+	[CHAW_KWORD_ENDCHUNK] = SV_STATIC("ENDCHUNK"),
+	[CHAW_KWORD_ADOPT] = SV_STATIC("ADOPT"),
+	[CHAW_KWORD_CHILD] = SV_STATIC("CHILD"),
+	[CHAW_KWORD_PARENT] = SV_STATIC("PARENT"),
+	[CHAW_KWORD_BO] = SV_STATIC("BO"),
+	[CHAW_KWORD_OSK] = SV_STATIC("OSK"),
+	[CHAW_KWORD_STN] = SV_STATIC("STN"),
+	[CHAW_KWORD_STZ] = SV_STATIC("STZ"),
+	[CHAW_KWORD_SZ] = SV_STATIC("SZ"),
+	[CHAW_KWORD_ST] = SV_STATIC("ST"),
+	[CHAW_KWORD_ALIGN] = SV_STATIC("ALIGN"),
+	[CHAW_KWORD_FILE] = SV_STATIC("FILE"),
+	[CHAW_KWORD_PACKEDFILE] = SV_STATIC("PACKEDFILE"),
+	[CHAW_KWORD_META] = SV_STATIC("META"),
+	[CHAW_KWORD_BITMAP] = SV_STATIC("BITMAP"),
+	[CHAW_KWORD_MASK] = SV_STATIC("MASK"),
+	[CHAW_KWORD_MIDI] = SV_STATIC("MIDI"),
+	[CHAW_KWORD_SCRIPT] = SV_STATIC("SCRIPT"),
+	[CHAW_KWORD_SCRIPTPF] = SV_STATIC("SCRIPTPF"),
+	[CHAW_KWORD_GL] = SV_STATIC("GL"),
+	[CHAW_KWORD_AL] = SV_STATIC("AL"),
+	[CHAW_KWORD_GG] = SV_STATIC("GG"),
+	[CHAW_KWORD_AG] = SV_STATIC("AG"),
+	[CHAW_KWORD_GST] = SV_STATIC("GST"),
+	[CHAW_KWORD_AST] = SV_STATIC("AST"),
+	[CHAW_KWORD_MACBO] = SV_STATIC("MACBO"),
+	[CHAW_KWORD_WINBO] = SV_STATIC("WINBO"),
+	[CHAW_KWORD_MACOSK] = SV_STATIC("MACOSK"),
+	[CHAW_KWORD_WINOSK] = SV_STATIC("WINOSK"),
+	[CHAW_KWORD_LONER] = SV_STATIC("LONER"),
+	[CHAW_KWORD_CURSOR] = SV_STATIC("CURSOR"),
+	[CHAW_KWORD_PALETTE] = SV_STATIC("PALETTE"),
+	[CHAW_KWORD_PREPACKED] = SV_STATIC("PREPACKED"),
+	[CHAW_KWORD_PACK] = SV_STATIC("PACK"),
+	[CHAW_KWORD_PACKFMT] = SV_STATIC("PACKFMT"),
+	[CHAW_KWORD_SUBFILE] = SV_STATIC("SUBFILE"),
+	[CHAW_KWORD_SET] = SV_STATIC("SET"),
+};
+
+String_View chaw_script_keywords[] = {
+	[CHAW_SCRIPT_KWORD_IF] = SV_STATIC("If"),
+	[CHAW_SCRIPT_KWORD_ELIF] = SV_STATIC("ElIf"),
+	[CHAW_SCRIPT_KWORD_ElSE] = SV_STATIC("Else"),
+	[CHAW_SCRIPT_KWORD_END] = SV_STATIC("End"),
+	[CHAW_SCRIPT_KWORD_WHILE] = SV_STATIC("While"),
+	[CHAW_SCRIPT_KWORD_BREAK] = SV_STATIC("Break"),
+	[CHAW_SCRIPT_KWORD_CONTINUE] = SV_STATIC("Continue"),
+};
 
 chaw_punct_type_t chaw_find_matching_punctuator(char *s) {
 	for (size_t i = 0; i < CHAW_COUNTOF(chaw_punctuators); i++) {
-		chaw_punct_metadata_t *metadata = &chaw_punctuators[i];
-		if (metadata->length == 0) {
+		String_View *sv = &chaw_punctuators[i];
+		if (sv->count == 0) {
 			continue;
 		}
-		if (strncmp(s, metadata->string, metadata->length - 1) == 0) {
+		if (strncmp(s, sv->data, sv->count) == 0) {
 			return i;
 		}
 	}
@@ -151,16 +190,42 @@ chaw_punct_type_t chaw_find_matching_punctuator(char *s) {
 }
 
 chaw_kword_type_t chaw_find_matching_keyword(char *s) {
-	for (size_t i = 0; i < CHAW_COUNTOF(chaw_keywords); i++) {
-		chaw_kword_metadata_t *metadata = &chaw_keywords[i];
-		if (metadata->length == 0) {
+	for (size_t i = 1; i < CHAW_COUNTOF(chaw_keywords); i++) {
+		String_View *sv = &chaw_keywords[i];
+		if (sv->count == 0) {
 			continue;
 		}
-		if (chaw_strncasecmp(s, metadata->string, metadata->length - 1) == 0) {
+		if (chaw_strncasecmp(s, sv->data, sv->count) == 0) {
 			return i;
 		}
 	}
 	return CHAW_KWORD_UNKNOWN;
+}
+
+chaw_script_punct_type_t chaw_script_find_matching_punctuator(char *s) {
+	for (size_t i = 0; i < CHAW_COUNTOF(chaw_script_punctuators); i++) {
+		String_View *sv = &chaw_script_punctuators[i];
+		if (sv->count == 0) {
+			continue;
+		}
+		if (strncmp(s, sv->data, sv->count) == 0) {
+			return i;
+		}
+	}
+	return CHAW_SCRIPT_PUNCT_UNKNOWN;
+}
+
+chaw_script_kword_type_t chaw_script_find_matching_keyword(char *s) {
+	for (size_t i = 0; i < CHAW_COUNTOF(chaw_script_keywords); i++) {
+		String_View *sv = &chaw_script_keywords[i];
+		if (sv->count == 0) {
+			continue;
+		}
+		if (chaw_strncasecmp(s, sv->data, sv->count) == 0) {
+			return i;
+		}
+	}
+	return CHAW_SCRIPT_KWORD_UNKNOWN;
 }
 
 bool chaw_is_valid_identifier_char(char c) {
@@ -185,15 +250,23 @@ bool chaw_is_valid_keyword(char *s) {
 	return chaw_find_matching_keyword(s) != CHAW_KWORD_UNKNOWN;
 }
 
+bool chaw_script_is_valid_punctuator(char *s) {
+	return chaw_script_find_matching_punctuator(s) != CHAW_SCRIPT_PUNCT_UNKNOWN;
+}
+
+bool chaw_script_is_valid_keyword(char *s) {
+	return chaw_script_find_matching_keyword(s) != CHAW_SCRIPT_KWORD_UNKNOWN;
+}
+
 void chaw_tokenize_punctuator(char **data, chaw_token_t *token) {
 	token->type = CHAW_TOKEN_PUNCTUATOR;
 	token->value.punct = CHAW_PUNCT_UNKNOWN;
 
 	char *literal = *data;
 	token->value.punct = chaw_find_matching_punctuator(literal);
-	literal += chaw_punctuators[token->value.punct].length - 2;
+	literal += chaw_punctuators[token->value.punct].count;
 
-	*data = literal + 1;
+	*data = literal;
 }
 
 void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
@@ -202,9 +275,31 @@ void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
 
 	char *literal = *data;
 	token->value.kword = chaw_find_matching_keyword(literal);
-	literal += chaw_keywords[token->value.kword].length - 2;
+	literal += chaw_keywords[token->value.kword].count;
 
-	*data = literal + 1;
+	*data = literal;
+}
+
+void chaw_script_tokenize_punctuator(char **data, chaw_token_t *token) {
+	token->type = CHAW_TOKEN_PUNCTUATOR;
+	token->value.script.punct = CHAW_SCRIPT_PUNCT_UNKNOWN;
+
+	char *literal = *data;
+	token->value.script.punct = chaw_script_find_matching_punctuator(literal);
+	literal += chaw_script_punctuators[token->value.punct].count;
+
+	*data = literal;
+}
+
+void chaw_script_tokenize_keyword(char **data, chaw_token_t *token) {
+	token->type = CHAW_TOKEN_KEYWORD;
+	token->value.script.kword = CHAW_SCRIPT_KWORD_UNKNOWN;
+
+	char *literal = *data;
+	token->value.script.kword = chaw_script_find_matching_keyword(literal);
+	literal += chaw_script_keywords[token->value.kword].count;
+
+	*data = literal;
 }
 
 void chaw_tokenize_identifier(char **data, chaw_token_t *token) {
@@ -367,25 +462,6 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 	*data = literal;
 }
 
-int chaw_tokenize_preprocessor(chaw_vec_token_t *vec, char **data) {
-	chaw_token_t current_token;
-	char *prep = *data;
-	for (; *prep != '\0'; prep++) {
-		if (*prep == '\\') {
-			for (; *prep != '\0' && *prep != '\n'; prep++);
-			continue;
-		}
-		if (*prep == '\n') {
-			break;
-		}
-		if (isspace(*prep)) {
-			continue;
-		}
-	}
-	*data = prep + 1;
-	return 0;
-}
-
 void chaw_get_line_and_column_from_index(char *s, size_t j, size_t *ln, size_t *col) {
 	(*ln) = 0;
 	(*col) = 0;
@@ -409,8 +485,76 @@ void chaw_get_line_and_column_from_index(char *s, size_t j, size_t *ln, size_t *
 	}
 }
 
+int chaw_tokenize_preprocessor(chaw_vec_token_t *vec, char **data_pointer) {
+	chaw_token_t current_token;
+
+	// NOTE(bjrkk): for now, we skip anything preprocessor related.
+	// chomp doesn't actually do any preprocessing, leaving it all to
+	// MSVC to do all the preprocessing magic.
+	char *data = *data_pointer;
+	while (*data != '\0') {
+		if (*data == '\n') {
+			break;
+		}
+
+		if (isspace(*data)) {
+			data++;
+			continue;
+		}
+
+		if (*data == '\\') {
+			for (; *data != '\0' && *data != '\n'; data++);
+			continue;
+		}
+
+		data++;
+	}
+	
+	*data_pointer = data + 1;
+	return 0;
+}
+
+int chaw_tokenize_script(chaw_vec_token_t *vec, char **data_pointer) {
+	chaw_token_t current_token;
+
+	char *data = *data_pointer;
+	while (*data != '\0') {
+		if (isspace(*data)) {
+			data++;
+			continue;
+		}
+
+		String_View *endchunk_identifier = &chaw_keywords[CHAW_KWORD_ENDCHUNK];
+		if (chaw_strncasecmp(endchunk_identifier->data, data, endchunk_identifier->count) == 0) {
+			break;
+		} 
+		
+		if (isdigit(*data)) {
+			chaw_tokenize_number(&data, &current_token);
+		} else if (*data == '\"') {
+			chaw_tokenize_string(&data, &current_token);
+		} else if (*data == '\'') {
+			chaw_tokenize_tag(&data, &current_token);
+		} else if (chaw_script_is_valid_keyword(data)) {
+			chaw_script_tokenize_keyword(&data, &current_token);
+		} else if (chaw_is_valid_identifier_char(*data)) {
+			chaw_tokenize_identifier(&data, &current_token);
+		} else if (chaw_script_is_valid_punctuator(data)) {
+			chaw_script_tokenize_punctuator(&data, &current_token);
+		} else {
+			printf("chaw: error: unexpected script token\n");
+			return 1;
+		}
+
+		vec_push(vec, current_token);
+	}
+	*data_pointer = data;
+	return 0;
+}
+
 int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 	chaw_token_t current_token;
+
 	char *begin = data;
 	while (*data != '\0') {
 		if (isspace(*data)) {
@@ -438,13 +582,30 @@ int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 			continue;
 		}
 
+		if (current_token.type == CHAW_TOKEN_KEYWORD) {
+			if (current_token.value.kword == CHAW_KWORD_SCRIPT || current_token.value.kword == CHAW_KWORD_SCRIPTPF) {
+				current_token.type = CHAW_TOKEN_SCRIPT_BEGIN;
+				vec_push(vec, current_token);
+
+				int result = chaw_tokenize_script(vec, &data);
+				if (result != 0) {
+					return result;
+				}
+				
+				current_token.type = CHAW_TOKEN_SCRIPT_END;
+				vec_push(vec, current_token);
+				continue;
+			}
+		}
+
 		if (*data == '#') {
 			current_token.type = CHAW_TOKEN_PREPROCESSOR_BEGIN;
-			int result = chaw_tokenize_preprocessor(vec, &data) != 0;
+			vec_push(vec, current_token);
+
+			int result = chaw_tokenize_preprocessor(vec, &data);
 			if (result != 0) {
 				return result;
 			}
-			vec_push(vec, current_token);
 			
 			current_token.type = CHAW_TOKEN_PREPROCESSOR_END;
 			vec_push(vec, current_token);
@@ -475,8 +636,80 @@ int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 	return 0;
 }
 
-void chaw_dump_tokens(chaw_vec_token_t *vec) {
-	for (size_t i = 0; i < vec->length; i++) {
+size_t chaw_script_dump_tokens(chaw_vec_token_t *vec, size_t begin) {
+	size_t i = begin;
+	for (; i < vec->length; i++) {
+		chaw_token_t *token = &vec->data[i];
+		if (token->type == CHAW_TOKEN_SCRIPT_END) {
+			break;
+		}
+		switch (token->type) {
+		case CHAW_TOKEN_INTEGER:
+			printf("{ number: %lld }\n", token->value.integer);
+			break;
+		case CHAW_TOKEN_DECIMAL:
+			printf("{ number: %f }\n", token->value.decimal);
+			break;
+		case CHAW_TOKEN_STRING:
+			printf("{ string: '%s' }\n", token->value.string);
+			break;
+		case CHAW_TOKEN_IDENTIFER:
+			printf("{ identifier: '%s' }\n", token->value.string);
+			break;
+		case CHAW_TOKEN_PUNCTUATOR:
+			printf("{ punctuator: '%s' }\n", chaw_script_punctuators[token->value.script.punct].data);
+			break;
+		case CHAW_TOKEN_KEYWORD:
+			printf("{ keywords: '%s' }\n", chaw_script_keywords[token->value.script.kword].data);
+			break;
+		default:
+			printf("{ unknown }\n");
+			break;
+		}
+	}
+	return i - begin;
+}
+
+size_t chaw_preprocessor_dump_tokens(chaw_vec_token_t *vec, size_t begin) {
+	size_t i = begin;
+	for (; i < vec->length; i++) {
+		chaw_token_t *token = &vec->data[i];
+		if (token->type == CHAW_TOKEN_PREPROCESSOR_END) {
+			break;
+		}
+		switch (token->type) {
+		case CHAW_TOKEN_INTEGER:
+			printf("{ number: %lld }\n", token->value.integer);
+			break;
+		case CHAW_TOKEN_DECIMAL:
+			printf("{ number: %f }\n", token->value.decimal);
+			break;
+		case CHAW_TOKEN_STRING:
+			printf("{ string: '%s' }\n", token->value.string);
+			break;
+		case CHAW_TOKEN_IDENTIFER:
+			printf("{ identifier: '%s' }\n", token->value.string);
+			break;
+		case CHAW_TOKEN_PUNCTUATOR:
+			printf("{ punctuator: '%s' }\n", chaw_punctuators[token->value.punct].data);
+			break;
+		case CHAW_TOKEN_KEYWORD:
+			printf("{ keywords: '%s' }\n", chaw_keywords[token->value.kword].data);
+			break;
+		case CHAW_TOKEN_TAG:
+			printf("{ tag: '%#010x' }\n", token->value.tag);
+			break;
+		default:
+			printf("{ unknown }\n");
+			break;
+		}
+	}
+	return i - begin;
+}
+
+size_t chaw_dump_tokens(chaw_vec_token_t *vec, size_t begin) {
+	size_t i = begin;
+	for (; i < vec->length; i++) {
 		chaw_token_t *token = &vec->data[i];
 		switch (token->type) {
 		case CHAW_TOKEN_INTEGER:
@@ -492,19 +725,31 @@ void chaw_dump_tokens(chaw_vec_token_t *vec) {
 			printf("{ identifier: '%s' }\n", token->value.string);
 			break;
 		case CHAW_TOKEN_PUNCTUATOR:
-			printf("{ punctuator: '%s' }\n", chaw_punctuators[token->value.punct].string);
+			printf("{ punctuator: '%s' }\n", chaw_punctuators[token->value.punct].data);
 			break;
 		case CHAW_TOKEN_KEYWORD:
-			printf("{ keyword: '%s' }\n", chaw_keywords[token->value.kword].string);
+			printf("{ keywords: '%s' }\n", chaw_keywords[token->value.kword].data);
 			break;
 		case CHAW_TOKEN_TAG:
 			printf("{ tag: '%#010x' }\n", token->value.tag);
+			break;
+		case CHAW_TOKEN_SCRIPT_BEGIN:
+			printf("{ script: {\n");
+			i++;
+			i += chaw_script_dump_tokens(vec, i);
+			printf("} }\n");
+			break;
+		case CHAW_TOKEN_PREPROCESSOR_BEGIN:
+			printf("{ preprocessor: {\n");
+			i += chaw_preprocessor_dump_tokens(vec, i);
+			printf("} }\n");
 			break;
 		default:
 			printf("{ unknown }\n");
 			break;
 		}
 	}
+	return i - begin;
 }
 
 void chaw_compile_cht(char *data) {
@@ -515,6 +760,6 @@ void chaw_compile_cht(char *data) {
 	} else {
 		printf("chaw: success: generated %d tokens\n", tokens.length);
 	}
-	chaw_dump_tokens(&tokens);
+	chaw_dump_tokens(&tokens, 0);
 	vec_deinit(&tokens);
 }
