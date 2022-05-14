@@ -132,6 +132,7 @@ chaw_kword_metadata_t chaw_keywords[] = {
 	DECLARE_KWORD(CHAW_KWORD_PACK, "PACK"),
 	DECLARE_KWORD(CHAW_KWORD_PACKFMT, "PACKFMT"),
 	DECLARE_KWORD(CHAW_KWORD_SUBFILE, "SUBFILE"),
+	DECLARE_KWORD(CHAW_KWORD_SET, "SET"),
 };
 
 #undef DECLARE_KWORD
@@ -283,6 +284,39 @@ void chaw_tokenize_string(char **data, chaw_token_t *token) {
 	*data = end + 1;
 }
 
+void chaw_tokenize_tag(char **data, chaw_token_t *token) {
+	token->type = CHAW_TOKEN_TAG;
+
+	char *literal = *data;
+	char delimiter = *literal;
+	
+	literal++;
+	uint32_t tag = 0;
+
+	size_t i = 0;
+	for (; i < sizeof(token->value.tag); i++) {
+		tag <<= 8;
+		tag |= literal[i];
+		if (literal[i] == delimiter) {
+			break;
+		}
+	}
+	
+	// TODO(bjrkk): should make this an error instead of a warning
+	// like in chomp. plus, we need some way of telling the tokenizer
+	// that we screwed up.
+	if (literal[i] != delimiter) {
+		printf("chaw: warning: tag larger than 4 characters\n");
+	}
+
+	literal += i;
+	for (; *literal != '\0' && *literal != delimiter; literal++);
+
+	token->value.tag = tag;
+
+	*data = literal + 1;
+}
+
 void chaw_tokenize_number(char **data, chaw_token_t *token) {
 	token->type = CHAW_TOKEN_INTEGER;
 	token->value.integer = 0;
@@ -417,8 +451,10 @@ int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 			continue;
 		} else if (isdigit(*data)) {
 			chaw_tokenize_number(&data, &current_token);
-		} else if (*data == '\"' || *data == '\'') {
+		} else if (*data == '\"') {
 			chaw_tokenize_string(&data, &current_token);
+		} else if (*data == '\'') {
+			chaw_tokenize_tag(&data, &current_token);
 		} else if (chaw_is_valid_keyword(data)) {
 			chaw_tokenize_keyword(&data, &current_token);
 		} else if (chaw_is_valid_identifier_char(*data)) {
@@ -461,6 +497,9 @@ void chaw_dump_tokens(chaw_vec_token_t *vec) {
 		case CHAW_TOKEN_KEYWORD:
 			printf("{ keyword: '%s' }\n", chaw_keywords[token->value.kword].string);
 			break;
+		case CHAW_TOKEN_TAG:
+			printf("{ tag: '%#010x' }\n", token->value.tag);
+			break;
 		default:
 			printf("{ unknown }\n");
 			break;
@@ -476,5 +515,6 @@ void chaw_compile_cht(char *data) {
 	} else {
 		printf("chaw: success: generated %d tokens\n", tokens.length);
 	}
+	chaw_dump_tokens(&tokens);
 	vec_deinit(&tokens);
 }

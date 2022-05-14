@@ -5,6 +5,7 @@ typedef enum {
 	CHAW_TOKEN_INTEGER,
 	CHAW_TOKEN_DECIMAL,
 	CHAW_TOKEN_STRING,
+	CHAW_TOKEN_TAG,
 	CHAW_TOKEN_IDENTIFER,
 	CHAW_TOKEN_PUNCTUATOR,
 	CHAW_TOKEN_KEYWORD,
@@ -112,6 +113,7 @@ typedef enum {
 	CHAW_KWORD_PACK,
 	CHAW_KWORD_PACKFMT,
 	CHAW_KWORD_SUBFILE,
+	CHAW_KWORD_SET
 } chaw_kword_type_t;
 
 typedef struct {
@@ -119,6 +121,7 @@ typedef struct {
 	union {
 		int64_t integer;
 		double decimal;
+		uint32_t tag;
 		char const *string;
 		chaw_punct_type_t punct;
 		chaw_kword_type_t kword;
