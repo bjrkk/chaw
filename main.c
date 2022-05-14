@@ -21,19 +21,6 @@ char const *filetype_names[] = {
     [CHAW_FILE_CHK] = "chk",
 };
 
-int chaw_strcasecmp(char const *lhs, char const *rhs) {
-    char lc, rc;
-    for (; *lhs != '\0' && *rhs != '\0'; lhs++, rhs++) {
-        lc = tolower(*lhs);
-        rc = tolower(*rhs);
-        if (lc != rc) {
-            break;
-        }
-    }
-
-    return (unsigned char)lc - (unsigned char)rc;
-}
-
 char const *chaw_get_file_extension(char const *str) {
     char const *ext = strrchr(str, '.');
     return ext;
