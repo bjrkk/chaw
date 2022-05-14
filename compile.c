@@ -192,7 +192,7 @@ void chaw_tokenize_punctuator(char **data, chaw_token_t *token) {
 	token->value.punct = chaw_find_matching_punctuator(literal);
 	literal += chaw_punctuators[token->value.punct].length - 2;
 
-	*data = literal;
+	*data = literal + 1;
 }
 
 void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
@@ -203,7 +203,7 @@ void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
 	token->value.kword = chaw_find_matching_keyword(literal);
 	literal += chaw_keywords[token->value.kword].length - 2;
 
-	*data = literal;
+	*data = literal + 1;
 }
 
 void chaw_tokenize_identifier(char **data, chaw_token_t *token) {
@@ -228,7 +228,7 @@ void chaw_tokenize_identifier(char **data, chaw_token_t *token) {
 
 	token->value.string = str;
 
-	*data = end - 1;
+	*data = end;
 }
 
 void chaw_tokenize_string(char **data, chaw_token_t *token) {
@@ -280,7 +280,7 @@ void chaw_tokenize_string(char **data, chaw_token_t *token) {
 
 	token->value.string = str;
 
-	*data = end;
+	*data = end + 1;
 }
 
 void chaw_tokenize_number(char **data, chaw_token_t *token) {
@@ -330,7 +330,7 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 		}
 	}
 
-	*data = literal - 1;
+	*data = literal;
 }
 
 int chaw_tokenize_preprocessor(chaw_vec_token_t *vec, char **data) {
@@ -348,7 +348,7 @@ int chaw_tokenize_preprocessor(chaw_vec_token_t *vec, char **data) {
 			continue;
 		}
 	}
-	*data = prep;
+	*data = prep + 1;
 	return 0;
 }
 
@@ -378,14 +378,16 @@ void chaw_get_line_and_column_from_index(char *s, size_t j, size_t *ln, size_t *
 int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 	chaw_token_t current_token;
 	char *begin = data;
-	for (; *data != '\0'; data++) {
+	while (*data != '\0') {
 		if (isspace(*data)) {
+			data++;
 			continue;
 		}
 
 		if (strncmp(data, "//", 2) == 0) {
 			for (; *data != '\0'; data++) {
 				if (*data == '\n') {
+					data++;
 					break;
 				}
 			}
@@ -395,7 +397,7 @@ int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 		if (strncmp(data, "/*", 2) == 0) {
 			for (; *data != '\0'; data++) {
 				if (strncmp(data, "*/", 2) == 0) {
-					data++;
+					data += 2;
 					break;
 				}
 			}
