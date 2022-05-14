@@ -201,7 +201,7 @@ void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
 
 	char *literal = *data;
 	token->value.kword = chaw_find_matching_keyword(literal);
-	literal += chaw_keywords[token->value.punct].length - 2;
+	literal += chaw_keywords[token->value.kword].length - 2;
 
 	*data = literal;
 }
@@ -301,7 +301,7 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 		radix = 2;
 	}
 
-	for (; *literal && isdigit(*literal); literal++) {
+	for (; *literal != '\0' && isdigit(*literal); literal++) {
 		token->value.integer *= radix;
 		if (*literal >= '0' && *literal <= '9') {
 			token->value.integer += (*literal - '0');
@@ -317,7 +317,7 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 		token->value.decimal = token->value.integer;
 		literal++;
 		float depth = radix;
-		for (; *literal && isdigit(*literal); literal++) {
+		for (; *literal != '\0' && isdigit(*literal); literal++) {
 			token->value.decimal += (*literal - '0') / depth;
 			depth *= radix;
 		}

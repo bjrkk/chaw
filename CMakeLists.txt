@@ -13,6 +13,7 @@ set (CMAKE_C_STANDARD 23)
 add_executable(chomp 
 	main.c 
 	compile.c
+	util.c
 	ext/vec.c
 )
 
