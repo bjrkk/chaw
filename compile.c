@@ -251,8 +251,8 @@ void chaw_tokenize_string(char **data, chaw_token_t *token) {
 
 	char *str = (char*)malloc(len + 1);
 	for (size_t i = 0; i < len; i++) {
-		if (end[i] == '\\') {
-			switch (end[i + 1]) {
+		if (begin[i] == '\\') {
+			switch (begin[i + 1]) {
 			case 'r':
 				str[i] = '\r';
 				break;
@@ -269,11 +269,11 @@ void chaw_tokenize_string(char **data, chaw_token_t *token) {
 				str[i] = '\0';
 				break;
 			default:
-				str[i] = end[i + 1];
+				str[i] = begin[i + 1];
 				break;
 			}
 		} else {
-			str[i] = end[i];
+			str[i] = begin[i];
 		}
 	}
 	str[len] = 0;
