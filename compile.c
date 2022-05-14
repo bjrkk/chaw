@@ -14,6 +14,11 @@ typedef struct {
 	char const *string;
 } chaw_punct_metadata_t;
 
+typedef struct {
+	size_t length;
+	char const *string;
+} chaw_kword_metadata_t;
+
 #define DECLARE_PUNCT(t, s) [t] = { \
 	.length = CHAW_COUNTOF(s), \
 	.string = s \
@@ -78,6 +83,59 @@ chaw_punct_metadata_t chaw_punctuators[] = {
 
 #undef DECLARE_PUNCT
 
+#define DECLARE_KWORD(t, s) [t] = { \
+	.length = CHAW_COUNTOF(s), \
+	.string = s \
+}
+
+chaw_kword_metadata_t chaw_keywords[] = {
+	DECLARE_KWORD(CHAW_KWORD_ITEM, "ITEM"),
+	DECLARE_KWORD(CHAW_KWORD_FREE, "FREE"),
+	DECLARE_KWORD(CHAW_KWORD_VAR, "VAR"),
+	DECLARE_KWORD(CHAW_KWORD_BYTE, "BYTE"),
+	DECLARE_KWORD(CHAW_KWORD_SHORT, "SHORT"),
+	DECLARE_KWORD(CHAW_KWORD_LONG, "LONG"),
+	DECLARE_KWORD(CHAW_KWORD_CHUNK, "CHUNK"),
+	DECLARE_KWORD(CHAW_KWORD_ENDCHUNK, "ENDCHUNK"),
+	DECLARE_KWORD(CHAW_KWORD_ADOPT, "ADOPT"),
+	DECLARE_KWORD(CHAW_KWORD_CHILD, "CHILD"),
+	DECLARE_KWORD(CHAW_KWORD_PARENT, "PARENT"),
+	DECLARE_KWORD(CHAW_KWORD_BO, "BO"),
+	DECLARE_KWORD(CHAW_KWORD_OSK, "OSK"),
+	DECLARE_KWORD(CHAW_KWORD_STN, "STN"),
+	DECLARE_KWORD(CHAW_KWORD_STZ, "STZ"),
+	DECLARE_KWORD(CHAW_KWORD_SZ, "SZ"),
+	DECLARE_KWORD(CHAW_KWORD_ST, "ST"),
+	DECLARE_KWORD(CHAW_KWORD_ALIGN, "ALIGN"),
+	DECLARE_KWORD(CHAW_KWORD_FILE, "FILE"),
+	DECLARE_KWORD(CHAW_KWORD_PACKEDFILE, "PACKEDFILE"),
+	DECLARE_KWORD(CHAW_KWORD_META, "META"),
+	DECLARE_KWORD(CHAW_KWORD_BITMAP, "BITMAP"),
+	DECLARE_KWORD(CHAW_KWORD_MASK, "MASK"),
+	DECLARE_KWORD(CHAW_KWORD_MIDI, "MIDI"),
+	DECLARE_KWORD(CHAW_KWORD_SCRIPT, "SCRIPT"),
+	DECLARE_KWORD(CHAW_KWORD_SCRIPTPF, "SCRIPTPF"),
+	DECLARE_KWORD(CHAW_KWORD_GL, "GL"),
+	DECLARE_KWORD(CHAW_KWORD_AL, "AL"),
+	DECLARE_KWORD(CHAW_KWORD_GG, "GG"),
+	DECLARE_KWORD(CHAW_KWORD_AG, "AG"),
+	DECLARE_KWORD(CHAW_KWORD_GST, "GST"),
+	DECLARE_KWORD(CHAW_KWORD_AST, "AST"),
+	DECLARE_KWORD(CHAW_KWORD_MACBO, "MACBO"),
+	DECLARE_KWORD(CHAW_KWORD_WINBO, "WINBO"),
+	DECLARE_KWORD(CHAW_KWORD_MACOSK, "MACOSK"),
+	DECLARE_KWORD(CHAW_KWORD_WINOSK, "WINOSK"),
+	DECLARE_KWORD(CHAW_KWORD_LONER, "LONER"),
+	DECLARE_KWORD(CHAW_KWORD_CURSOR, "CURSOR"),
+	DECLARE_KWORD(CHAW_KWORD_PALETTE, "PALETTE"),
+	DECLARE_KWORD(CHAW_KWORD_PREPACKED, "PREPACKED"),
+	DECLARE_KWORD(CHAW_KWORD_PACK, "PACK"),
+	DECLARE_KWORD(CHAW_KWORD_PACKFMT, "PACKFMT"),
+	DECLARE_KWORD(CHAW_KWORD_SUBFILE, "SUBFILE"),
+};
+
+#undef DECLARE_KWORD
+
 chaw_punct_type_t chaw_find_matching_punctuator(char *s) {
 	for (size_t i = 0; i < CHAW_COUNTOF(chaw_punctuators); i++) {
 		chaw_punct_metadata_t *metadata = &chaw_punctuators[i];
@@ -89,6 +147,19 @@ chaw_punct_type_t chaw_find_matching_punctuator(char *s) {
 		}
 	}
 	return CHAW_PUNCT_UNKNOWN;
+}
+
+chaw_kword_type_t chaw_find_matching_keyword(char *s) {
+	for (size_t i = 0; i < CHAW_COUNTOF(chaw_keywords); i++) {
+		chaw_kword_metadata_t *metadata = &chaw_keywords[i];
+		if (metadata->length == 0) {
+			continue;
+		}
+		if (chaw_strncasecmp(s, metadata->string, metadata->length - 1) == 0) {
+			return i;
+		}
+	}
+	return CHAW_KWORD_UNKNOWN;
 }
 
 bool chaw_is_valid_identifier_char(char c) {
@@ -109,6 +180,10 @@ bool chaw_is_valid_punctuator(char *s) {
 	return chaw_find_matching_punctuator(s) != CHAW_PUNCT_UNKNOWN;
 }
 
+bool chaw_is_valid_keyword(char *s) {
+	return chaw_find_matching_keyword(s) != CHAW_KWORD_UNKNOWN;
+}
+
 void chaw_tokenize_punctuator(char **data, chaw_token_t *token) {
 	token->type = CHAW_TOKEN_PUNCTUATOR;
 	token->value.punct = CHAW_PUNCT_UNKNOWN;
@@ -116,6 +191,17 @@ void chaw_tokenize_punctuator(char **data, chaw_token_t *token) {
 	char *literal = *data;
 	token->value.punct = chaw_find_matching_punctuator(literal);
 	literal += chaw_punctuators[token->value.punct].length - 2;
+
+	*data = literal;
+}
+
+void chaw_tokenize_keyword(char **data, chaw_token_t *token) {
+	token->type = CHAW_TOKEN_KEYWORD;
+	token->value.kword = CHAW_KWORD_UNKNOWN;
+
+	char *literal = *data;
+	token->value.kword = chaw_find_matching_keyword(literal);
+	literal += chaw_keywords[token->value.punct].length - 2;
 
 	*data = literal;
 }
@@ -327,6 +413,8 @@ int chaw_tokenize(chaw_vec_token_t *vec, char *data) {
 			chaw_tokenize_number(&data, &current_token);
 		} else if (*data == '\"' || *data == '\'') {
 			chaw_tokenize_string(&data, &current_token);
+		} else if (chaw_is_valid_keyword(data)) {
+			chaw_tokenize_keyword(&data, &current_token);
 		} else if (chaw_is_valid_identifier_char(*data)) {
 			chaw_tokenize_identifier(&data, &current_token);
 		} else if (chaw_is_valid_punctuator(data)) {
@@ -363,6 +451,9 @@ void chaw_dump_tokens(chaw_vec_token_t *vec) {
 			break;
 		case CHAW_TOKEN_PUNCTUATOR:
 			printf("{ punctuator: '%s' }\n", chaw_punctuators[token->value.punct].string);
+			break;
+		case CHAW_TOKEN_KEYWORD:
+			printf("{ keyword: '%s' }\n", chaw_keywords[token->value.kword].string);
 			break;
 		default:
 			printf("{ unknown }\n");
