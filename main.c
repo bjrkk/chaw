@@ -51,7 +51,7 @@ chaw_filetype_t chaw_get_filetype(char const *path) {
 }
 
 void usage(void) {
-    printf("OVERVIEW: chunky file compiler for kauai");
+    printf("OVERVIEW: chunky file compiler for kauai\n");
     printf("USAGE: chaw.exe [options] file...\n");
     printf("OPTIONS:\n");
     printf("  -c --compile      Compiles the given chunky source files. Set by default.\n");
