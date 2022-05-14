@@ -301,14 +301,18 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 		radix = 2;
 	}
 
-	for (; *literal != '\0' && isdigit(*literal); literal++) {
-		token->value.integer *= radix;
+	for (; *literal != '\0'; literal++) {
 		if (*literal >= '0' && *literal <= '9') {
+			token->value.integer *= radix;
 			token->value.integer += (*literal - '0');
 		} else if (*literal >= 'A' && *literal <= 'Z' && radix > 10) {
-			token->value.integer += (*literal - 'A');
+			token->value.integer *= radix;
+			token->value.integer += (*literal - 'A') + 10;
 		} else if (*literal >= 'a' && *literal <= 'z' && radix > 10) {
-			token->value.integer += (*literal - 'A');
+			token->value.integer *= radix;
+			token->value.integer += (*literal - 'a') + 10;
+		} else {
+			break;
 		}
 	}
 
@@ -326,7 +330,7 @@ void chaw_tokenize_number(char **data, chaw_token_t *token) {
 		}
 	}
 
-	*data = literal;
+	*data = literal - 1;
 }
 
 int chaw_tokenize_preprocessor(chaw_vec_token_t *vec, char **data) {
